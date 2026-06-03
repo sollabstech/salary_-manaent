@@ -1,0 +1,64 @@
+import type { AttendanceRecord, AdvanceRecord } from '@/types'
+
+export function calculatePerDaySalary(monthlySalary: number, workingDays = 30): number {
+  return monthlySalary / workingDays
+}
+
+export function calculateLeaveDeduction(
+  monthlySalary: number,
+  absentDays: number,
+  halfDays: number,
+  workingDays = 30
+): number {
+  const perDay = calculatePerDaySalary(monthlySalary, workingDays)
+  return Math.round(perDay * (absentDays + halfDays * 0.5) * 100) / 100
+}
+
+export function calculateFinalSalary(params: {
+  baseSalary: number
+  leaveDeduction: number
+  advanceDeduction: number
+  bonus: number
+  otherDeductions: number
+  lateDeduction: number
+}): number {
+  const { baseSalary, leaveDeduction, advanceDeduction, bonus, otherDeductions, lateDeduction } = params
+  const final = baseSalary - leaveDeduction - advanceDeduction - otherDeductions - lateDeduction + bonus
+  return Math.max(0, Math.round(final * 100) / 100)
+}
+
+export function getAttendanceSummary(
+  records: AttendanceRecord[],
+  month: number,
+  year: number
+): { present: number; absent: number; halfday: number; late: number; overtime: number; leave: number } {
+  const filtered = records.filter(r => {
+    const d = new Date(r.date)
+    return d.getMonth() + 1 === month && d.getFullYear() === year
+  })
+  return {
+    present: filtered.filter(r => r.status === 'present').length,
+    absent: filtered.filter(r => r.status === 'absent').length,
+    halfday: filtered.filter(r => r.status === 'halfday').length,
+    late: filtered.filter(r => r.status === 'late').length,
+    overtime: filtered.filter(r => r.status === 'overtime').length,
+    leave: filtered.filter(r => r.status === 'leave').length,
+  }
+}
+
+export function getPendingAdvanceForMonth(
+  advances: AdvanceRecord[],
+  employeeId: string,
+  month: number,
+  year: number
+): number {
+  return advances
+    .filter(
+      a =>
+        a.employeeId === employeeId &&
+        a.status !== 'adjusted' &&
+        a.adjustMonth === month &&
+        a.adjustYear === year
+    )
+    .reduce((sum, a) => sum + (a.amount - a.adjustedAmount), 0)
+}
