@@ -13,13 +13,17 @@ import { DollarSign, Eye, FileDown, CheckCircle } from 'lucide-react'
 interface SalaryTableProps {
   records: SalaryRecord[]
   editValues: Record<string, Partial<SalaryRecord>>
-  onFieldChange: (id: string, field: keyof SalaryRecord, value: number) => void
+  workingDays: number
+  onFieldChange: (id: string, field: keyof SalaryRecord, value: number, workingDays: number) => void
   onViewSlip: (record: SalaryRecord) => void
   onMarkPaid: (id: string) => void
   onDownloadSlip: (record: SalaryRecord) => void
 }
 
-export function SalaryTable({ records, editValues, onFieldChange, onViewSlip, onMarkPaid, onDownloadSlip }: SalaryTableProps) {
+export function SalaryTable({
+  records, editValues, workingDays,
+  onFieldChange, onViewSlip, onMarkPaid, onDownloadSlip
+}: SalaryTableProps) {
   if (records.length === 0) {
     return (
       <EmptyState
@@ -35,21 +39,46 @@ export function SalaryTable({ records, editValues, onFieldChange, onViewSlip, on
     return s + (ev.finalSalary ?? r.finalSalary)
   }, 0)
 
+  const numInput = (
+    id: string,
+    field: keyof SalaryRecord,
+    value: number,
+    color?: string
+  ) => (
+    <Input
+      type="number"
+      min={0}
+      className={`h-7 w-20 text-xs text-center ${color ?? ''}`}
+      value={value}
+      onChange={e => onFieldChange(id, field, Number(e.target.value), workingDays)}
+    />
+  )
+
   return (
     <div className="space-y-3">
+      {/* Working days info bar */}
+      <div className="flex items-center gap-2 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 text-xs text-blue-700 dark:text-blue-300">
+        <DollarSign className="h-3.5 w-3.5" />
+        <span>
+          Salary basis: <strong>{workingDays} working days</strong> —
+          editing <strong>Absent</strong> or <strong>Half Days</strong> auto-updates Leave Deduction &amp; Net Salary
+        </span>
+      </div>
+
       <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow className="bg-slate-50 dark:bg-slate-800/50">
               <TableHead>Employee</TableHead>
-              <TableHead>Base Salary</TableHead>
-              <TableHead>Present</TableHead>
-              <TableHead>Absent</TableHead>
-              <TableHead>Leave Ded.</TableHead>
-              <TableHead>Advance</TableHead>
-              <TableHead>Bonus</TableHead>
-              <TableHead>Other Ded.</TableHead>
-              <TableHead className="text-purple-600 dark:text-purple-400 font-bold">Net Salary</TableHead>
+              <TableHead>Base</TableHead>
+              <TableHead className="text-emerald-600">Present</TableHead>
+              <TableHead className="text-red-500">Absent</TableHead>
+              <TableHead className="text-amber-500">Half Days</TableHead>
+              <TableHead className="text-orange-500">Leave Ded.</TableHead>
+              <TableHead className="text-red-600">Advance ⬇</TableHead>
+              <TableHead className="text-emerald-600">Bonus ⬆</TableHead>
+              <TableHead className="text-slate-500">Other Ded.</TableHead>
+              <TableHead className="text-purple-600 font-bold">Net Salary</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -57,14 +86,18 @@ export function SalaryTable({ records, editValues, onFieldChange, onViewSlip, on
           <TableBody>
             {records.map((record, i) => {
               const ev = editValues[record.id] ?? {}
-              const get = (field: keyof SalaryRecord) => (ev[field] ?? record[field]) as number
+              const get = (field: keyof SalaryRecord) =>
+                (field in ev ? ev[field] : record[field]) as number
 
-              const finalSalary = record.baseSalary
-                - get('leaveDeduction')
-                - get('advanceDeduction')
-                - get('lateDeduction')
-                - get('otherDeductions')
-                + get('bonus')
+              const absentDays  = get('absentDays')
+              const halfDays    = get('halfDays')
+              const presentDays = get('presentDays')
+              const leaveDeduction  = get('leaveDeduction')
+              const advanceDeduction = get('advanceDeduction')
+              const lateDeduction   = get('lateDeduction')
+              const bonus           = get('bonus')
+              const otherDeductions = get('otherDeductions')
+              const finalSalary = ev.finalSalary ?? record.finalSalary
 
               return (
                 <motion.tr
@@ -74,55 +107,73 @@ export function SalaryTable({ records, editValues, onFieldChange, onViewSlip, on
                   transition={{ delay: i * 0.04 }}
                   className="border-b border-slate-100 dark:border-slate-800"
                 >
+                  {/* Employee */}
                   <TableCell>
                     <p className="font-medium text-sm text-slate-900 dark:text-slate-100">{record.employeeName}</p>
                     <p className="text-xs text-slate-500">{record.branch}</p>
                   </TableCell>
-                  <TableCell className="text-sm">{formatCurrency(record.baseSalary)}</TableCell>
-                  <TableCell className="text-sm text-emerald-600">{record.presentDays}</TableCell>
-                  <TableCell className="text-sm text-red-500">{record.absentDays}</TableCell>
+
+                  {/* Base Salary */}
+                  <TableCell className="text-sm font-medium">{formatCurrency(record.baseSalary)}</TableCell>
+
+                  {/* Present Days — editable */}
                   <TableCell>
-                    <Input
-                      type="number"
-                      className="h-7 w-24 text-xs"
-                      value={get('leaveDeduction')}
-                      onChange={e => onFieldChange(record.id, 'leaveDeduction', Number(e.target.value))}
-                    />
+                    {numInput(record.id, 'presentDays', presentDays)}
                   </TableCell>
+
+                  {/* Absent Days — editable, triggers leave deduction recalc */}
                   <TableCell>
-                    <Input
-                      type="number"
-                      className="h-7 w-24 text-xs"
-                      value={get('advanceDeduction')}
-                      onChange={e => onFieldChange(record.id, 'advanceDeduction', Number(e.target.value))}
-                    />
+                    {numInput(record.id, 'absentDays', absentDays)}
                   </TableCell>
+
+                  {/* Half Days — editable, triggers leave deduction recalc */}
                   <TableCell>
-                    <Input
-                      type="number"
-                      className="h-7 w-24 text-xs"
-                      value={get('bonus')}
-                      onChange={e => onFieldChange(record.id, 'bonus', Number(e.target.value))}
-                    />
+                    {numInput(record.id, 'halfDays', halfDays)}
                   </TableCell>
+
+                  {/* Leave Deduction — auto-calculated but editable override */}
                   <TableCell>
-                    <Input
-                      type="number"
-                      className="h-7 w-24 text-xs"
-                      value={get('otherDeductions')}
-                      onChange={e => onFieldChange(record.id, 'otherDeductions', Number(e.target.value))}
-                    />
+                    <div className="space-y-0.5">
+                      {numInput(record.id, 'leaveDeduction', leaveDeduction)}
+                      <p className="text-[10px] text-slate-400 text-center">auto</p>
+                    </div>
                   </TableCell>
+
+                  {/* Advance — auto-filled from advance module */}
                   <TableCell>
-                    <span className="font-bold text-purple-700 dark:text-purple-300 text-sm">
+                    <div className="space-y-0.5">
+                      {numInput(record.id, 'advanceDeduction', advanceDeduction)}
+                      {advanceDeduction > 0 && (
+                        <p className="text-[10px] text-red-400 text-center">advance</p>
+                      )}
+                    </div>
+                  </TableCell>
+
+                  {/* Bonus */}
+                  <TableCell>
+                    {numInput(record.id, 'bonus', bonus)}
+                  </TableCell>
+
+                  {/* Other Deductions */}
+                  <TableCell>
+                    {numInput(record.id, 'otherDeductions', otherDeductions)}
+                  </TableCell>
+
+                  {/* Net Salary */}
+                  <TableCell>
+                    <span className="font-bold text-purple-700 dark:text-purple-300 text-sm whitespace-nowrap">
                       {formatCurrency(Math.max(0, finalSalary))}
                     </span>
                   </TableCell>
+
+                  {/* Status */}
                   <TableCell>
                     <Badge variant={record.paid ? 'success' : 'warning'}>
                       {record.paid ? 'Paid' : 'Pending'}
                     </Badge>
                   </TableCell>
+
+                  {/* Actions */}
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onViewSlip(record)} title="View Slip">
@@ -145,6 +196,7 @@ export function SalaryTable({ records, editValues, onFieldChange, onViewSlip, on
         </Table>
       </div>
 
+      {/* Total */}
       <div className="flex justify-between items-center rounded-xl bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 px-4 py-3">
         <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Total Net Salary</span>
         <span className="text-lg font-bold text-purple-700 dark:text-purple-300">{formatCurrency(total)}</span>

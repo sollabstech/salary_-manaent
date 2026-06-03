@@ -46,6 +46,26 @@ export function getAttendanceSummary(
   }
 }
 
+/**
+ * Gets ALL advances assigned to a specific month (regardless of status).
+ * Used when generating salary — advance is deducted and then marked adjusted on save.
+ */
+export function getAdvanceForMonth(
+  advances: AdvanceRecord[],
+  employeeId: string,
+  month: number,
+  year: number
+): number {
+  return advances
+    .filter(a =>
+      a.employeeId === employeeId &&
+      a.adjustMonth === month &&
+      a.adjustYear === year
+    )
+    .reduce((sum, a) => sum + a.amount, 0)
+}
+
+/** @deprecated Use getAdvanceForMonth for salary generation */
 export function getPendingAdvanceForMonth(
   advances: AdvanceRecord[],
   employeeId: string,
@@ -53,12 +73,11 @@ export function getPendingAdvanceForMonth(
   year: number
 ): number {
   return advances
-    .filter(
-      a =>
-        a.employeeId === employeeId &&
-        a.status !== 'adjusted' &&
-        a.adjustMonth === month &&
-        a.adjustYear === year
+    .filter(a =>
+      a.employeeId === employeeId &&
+      a.status !== 'adjusted' &&
+      a.adjustMonth === month &&
+      a.adjustYear === year
     )
     .reduce((sum, a) => sum + (a.amount - a.adjustedAmount), 0)
 }
