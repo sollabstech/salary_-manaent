@@ -1,13 +1,14 @@
 'use client'
 
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import type { SalaryRecord, Employee, CompanySettings } from '@/types'
 import { formatCurrency } from '@/lib/utils'
 import { MONTHS } from '@/lib/utils'
-import { FileDown, Printer } from 'lucide-react'
-import { generateSalarySlipPDF } from '@/lib/pdf-generator'
+import { FileDown, FileText, Printer, ChevronDown } from 'lucide-react'
+import { generateSalarySlipPDF, generateThermalSalarySlipPDF } from '@/lib/pdf-generator'
 import { toast } from 'sonner'
 
 interface SalarySlipModalProps {
@@ -25,10 +26,14 @@ export function SalarySlipModal({ open, onOpenChange, record, employee, settings
   const totalDeductions = record.leaveDeduction + record.advanceDeduction + record.lateDeduction + record.otherDeductions
   const sym = settings.currencySymbol ?? '₹'
 
-  const handleDownload = async () => {
+  const handleDownload = async (format: 'pdf' | 'thermal') => {
     try {
-      await generateSalarySlipPDF(record, employee, settings)
-      toast.success('PDF downloaded!')
+      if (format === 'thermal') {
+        await generateThermalSalarySlipPDF(record, employee, settings)
+      } else {
+        await generateSalarySlipPDF(record, employee, settings)
+      }
+      toast.success('Downloaded!')
     } catch {
       toast.error('Failed to generate PDF')
     }
@@ -154,9 +159,45 @@ export function SalarySlipModal({ open, onOpenChange, record, employee, settings
           <Button variant="outline" onClick={handlePrint}>
             <Printer className="h-4 w-4 mr-2" />Print
           </Button>
-          <Button onClick={handleDownload}>
-            <FileDown className="h-4 w-4 mr-2" />Download PDF
-          </Button>
+
+          {/* Download dropdown */}
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <Button className="gap-2">
+                <FileDown className="h-4 w-4" />
+                Download
+                <ChevronDown className="h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content
+                className="z-[60] min-w-[180px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg p-1 text-sm"
+                sideOffset={6}
+                align="end"
+              >
+                <DropdownMenu.Item
+                  className="flex items-center gap-2 rounded-md px-3 py-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 outline-none"
+                  onSelect={() => handleDownload('pdf')}
+                >
+                  <FileText className="h-4 w-4 text-purple-600" />
+                  <div>
+                    <p className="font-medium">Standard PDF</p>
+                    <p className="text-xs text-slate-400">A4 size salary slip</p>
+                  </div>
+                </DropdownMenu.Item>
+                <DropdownMenu.Item
+                  className="flex items-center gap-2 rounded-md px-3 py-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 outline-none"
+                  onSelect={() => handleDownload('thermal')}
+                >
+                  <Printer className="h-4 w-4 text-blue-600" />
+                  <div>
+                    <p className="font-medium">3-inch Thermal</p>
+                    <p className="text-xs text-slate-400">80mm receipt format</p>
+                  </div>
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
         </DialogFooter>
       </DialogContent>
     </Dialog>

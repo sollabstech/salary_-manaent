@@ -19,11 +19,12 @@ import {
 } from '@/lib/salary-calculator'
 import { generateId } from '@/lib/utils'
 import { currentMonth, currentYear } from '@/utils/date-helpers'
-import { generateSalarySlipPDF, generatePayrollReportPDF } from '@/lib/pdf-generator'
+import { generateSalarySlipPDF, generatePayrollReportPDF, generateThermalSalarySlipPDF, generateThermalPayrollReportPDF } from '@/lib/pdf-generator'
 import { exportToExcel } from '@/utils/export-excel'
 import { markAdvanceAdjusted } from '@/services/advanceService'
 import { toast } from 'sonner'
-import { Save, FileDown, Sheet } from 'lucide-react'
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
+import { Save, FileDown, FileText, Printer, Sheet, ChevronDown } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export default function SalaryPage() {
@@ -82,11 +83,14 @@ export default function SalaryPage() {
 
       // Calculations
       const lateAmt = attSummary.late * (settings?.lateDeductionAmount ?? 0)
+      const extraLeaveDays = Math.max(0, attSummary.leave - emp.paidLeave)
       const leaveDeduction = calculateLeaveDeduction(
         emp.salary,
         attSummary.absent,
         attSummary.halfday,
-        workingDays
+        workingDays,
+        attSummary.leave,
+        emp.paidLeave
       )
       const finalSalary = calculateFinalSalary({
         baseSalary: emp.salary,
@@ -111,6 +115,8 @@ export default function SalaryPage() {
         absentDays: attSummary.absent,
         halfDays: attSummary.halfday,
         leaveDays: attSummary.leave,
+        paidLeaveAllowed: emp.paidLeave,
+        extraLeaveDays,
         overtimeDays: attSummary.overtime,
         lateDeduction: lateAmt,
         leaveDeduction,
@@ -118,6 +124,8 @@ export default function SalaryPage() {
         bonus: 0,
         otherDeductions: 0,
         finalSalary,
+        cashPayment: 0,
+        bankPayment: 0,
         paid: false,
         remarks: '',
         createdAt: now,
@@ -146,11 +154,14 @@ export default function SalaryPage() {
       const get = (f: keyof SalaryRecord) =>
         (f in updated ? updated[f] : record[f]) as number
 
-      // Auto-recalculate leave deduction when absent/halfDays change
-      if (field === 'absentDays' || field === 'halfDays') {
+      // Auto-recalculate leave deduction when absent/halfDays/leaveDays change
+      if (field === 'absentDays' || field === 'halfDays' || field === 'leaveDays') {
         const perDay = record.baseSalary / days
+        const paidLeaveAllowed = record.paidLeaveAllowed ?? 0
+        const extraLeave = Math.max(0, get('leaveDays') - paidLeaveAllowed)
+        updated.extraLeaveDays = extraLeave
         updated.leaveDeduction = Math.round(
-          perDay * (get('absentDays') + get('halfDays') * 0.5) * 100
+          perDay * (get('absentDays') + get('halfDays') * 0.5 + extraLeave) * 100
         ) / 100
       }
 
@@ -192,12 +203,16 @@ export default function SalaryPage() {
   }
 
   // ─── Downloads ───────────────────────────────────────────────────────────────
-  const handleDownloadPDF = async () => {
+  const handleDownloadReport = async (format: 'pdf' | 'thermal') => {
     if (!settings) return
     try {
       const final = generated.map(r => ({ ...r, ...(editValues[r.id] ?? {}) }))
-      await generatePayrollReportPDF(final, month, year, settings)
-      toast.success('PDF downloaded!')
+      if (format === 'thermal') {
+        await generateThermalPayrollReportPDF(final, month, year, settings)
+      } else {
+        await generatePayrollReportPDF(final, month, year, settings)
+      }
+      toast.success('Downloaded!')
     } catch { toast.error('PDF generation failed') }
   }
 
@@ -251,9 +266,45 @@ export default function SalaryPage() {
             <Button variant="outline" size="sm" onClick={handleExcel} className="gap-2">
               <Sheet className="h-3.5 w-3.5" />Excel
             </Button>
-            <Button variant="outline" size="sm" onClick={handleDownloadPDF} className="gap-2">
-              <FileDown className="h-3.5 w-3.5" />PDF Report
-            </Button>
+
+            {/* PDF Report dropdown */}
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <FileDown className="h-3.5 w-3.5" />PDF Report
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content
+                  className="z-50 min-w-[190px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg p-1 text-sm"
+                  sideOffset={6}
+                  align="end"
+                >
+                  <DropdownMenu.Item
+                    className="flex items-center gap-2 rounded-md px-3 py-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 outline-none"
+                    onSelect={() => handleDownloadReport('pdf')}
+                  >
+                    <FileText className="h-4 w-4 text-purple-600" />
+                    <div>
+                      <p className="font-medium">Standard PDF</p>
+                      <p className="text-xs text-slate-400">A4 payroll report</p>
+                    </div>
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item
+                    className="flex items-center gap-2 rounded-md px-3 py-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 outline-none"
+                    onSelect={() => handleDownloadReport('thermal')}
+                  >
+                    <Printer className="h-4 w-4 text-blue-600" />
+                    <div>
+                      <p className="font-medium">3-inch Thermal</p>
+                      <p className="text-xs text-slate-400">80mm receipt format</p>
+                    </div>
+                  </DropdownMenu.Item>
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+
             <Button size="sm" onClick={handleSaveAll} className="gap-2">
               <Save className="h-3.5 w-3.5" />Save All
             </Button>
@@ -289,12 +340,17 @@ export default function SalaryPage() {
           setGenerated(g => g.map(r => r.id === id ? { ...r, paid: true } : r))
           toast.success('Marked as paid!')
         }}
-        onDownloadSlip={async r => {
+        onDownloadSlip={async (r, format) => {
           const emp = employees.find(e => e.id === r.employeeId)
           if (emp && settings) {
             const ev = editValues[r.id] ?? {}
-            await generateSalarySlipPDF({ ...r, ...ev }, emp, settings)
-            toast.success('PDF downloaded!')
+            const merged = { ...r, ...ev }
+            if (format === 'thermal') {
+              await generateThermalSalarySlipPDF(merged, emp, settings)
+            } else {
+              await generateSalarySlipPDF(merged, emp, settings)
+            }
+            toast.success('Downloaded!')
           }
         }}
       />

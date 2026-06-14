@@ -8,10 +8,13 @@ export function calculateLeaveDeduction(
   monthlySalary: number,
   absentDays: number,
   halfDays: number,
-  workingDays = 30
+  workingDays = 30,
+  leaveDays = 0,
+  paidLeave = 0
 ): number {
   const perDay = calculatePerDaySalary(monthlySalary, workingDays)
-  return Math.round(perDay * (absentDays + halfDays * 0.5) * 100) / 100
+  const extraLeave = Math.max(0, leaveDays - paidLeave)
+  return Math.round(perDay * (absentDays + halfDays * 0.5 + extraLeave) * 100) / 100
 }
 
 export function calculateFinalSalary(params: {
@@ -47,8 +50,10 @@ export function getAttendanceSummary(
 }
 
 /**
- * Gets ALL advances assigned to a specific month (regardless of status).
- * Used when generating salary — advance is deducted and then marked adjusted on save.
+ * Gets pending/partial advances for salary deduction:
+ * - Advances explicitly assigned to this month/year, OR
+ * - Advances with no month assigned (pending, auto-deduct to current salary)
+ * Already-adjusted advances are excluded to prevent double-deduction.
  */
 export function getAdvanceForMonth(
   advances: AdvanceRecord[],
@@ -59,8 +64,13 @@ export function getAdvanceForMonth(
   return advances
     .filter(a =>
       a.employeeId === employeeId &&
-      a.adjustMonth === month &&
-      a.adjustYear === year
+      a.status !== 'adjusted' &&
+      (
+        // Explicitly assigned to this salary month
+        (a.adjustMonth === month && a.adjustYear === year) ||
+        // Unassigned pending advance — auto-deduct to this month
+        (!a.adjustMonth && !a.adjustYear)
+      )
     )
     .reduce((sum, a) => sum + a.amount, 0)
 }

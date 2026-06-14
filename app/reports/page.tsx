@@ -38,6 +38,10 @@ export default function ReportsPage() {
   const [branch, setBranch]         = useState('all')
   const [employeeId, setEmployeeId] = useState('all')
   const [activeTab, setActiveTab]   = useState('salary')
+  const [fromDate, setFromDate]     = useState('')
+  const [toDate, setToDate]         = useState('')
+
+  const hasDateRange = !!(fromDate && toDate)
 
   const branches = useMemo(() => [...new Set(employees.map(e => e.branch))].filter(Boolean), [employees])
 
@@ -61,25 +65,36 @@ export default function ReportsPage() {
     ), [employees, branch, employeeId])
 
   const filteredSalary = useMemo(() =>
-    salaryRecords.filter(r =>
-      r.month === month && r.year === year &&
-      (branch === 'all' || r.branch === branch) &&
-      (employeeId === 'all' || r.employeeId === employeeId)
-    ), [salaryRecords, month, year, branch, employeeId])
+    salaryRecords.filter(r => {
+      const branchOk   = branch === 'all' || r.branch === branch
+      const empOk      = employeeId === 'all' || r.employeeId === employeeId
+      if (hasDateRange) {
+        // salary record belongs to its full month — include if month overlaps range
+        const monthStart = `${r.year}-${String(r.month).padStart(2, '0')}-01`
+        const lastDay    = new Date(r.year, r.month, 0).getDate()
+        const monthEnd   = `${r.year}-${String(r.month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+        return branchOk && empOk && monthStart <= toDate && monthEnd >= fromDate
+      }
+      return r.month === month && r.year === year && branchOk && empOk
+    }), [salaryRecords, month, year, branch, employeeId, hasDateRange, fromDate, toDate])
 
   const filteredAttendance = useMemo(() => {
     const empIds = new Set(filteredEmployees.map(e => e.id))
     return attendance.filter(r => {
+      if (!empIds.has(r.employeeId)) return false
+      if (hasDateRange) return r.date >= fromDate && r.date <= toDate
       const d = new Date(r.date)
-      return d.getMonth() + 1 === month && d.getFullYear() === year && empIds.has(r.employeeId)
+      return d.getMonth() + 1 === month && d.getFullYear() === year
     })
-  }, [attendance, filteredEmployees, month, year])
+  }, [attendance, filteredEmployees, month, year, hasDateRange, fromDate, toDate])
 
   const filteredAdvances = useMemo(() =>
-    advances.filter(r =>
-      (employeeId === 'all' || r.employeeId === employeeId) &&
-      (branch === 'all' || employees.find(e => e.id === r.employeeId)?.branch === branch)
-    ), [advances, employeeId, branch, employees])
+    advances.filter(r => {
+      const empOk    = employeeId === 'all' || r.employeeId === employeeId
+      const branchOk = branch === 'all' || employees.find(e => e.id === r.employeeId)?.branch === branch
+      if (hasDateRange) return empOk && branchOk && r.date >= fromDate && r.date <= toDate
+      return empOk && branchOk
+    }), [advances, employeeId, branch, employees, hasDateRange, fromDate, toDate])
 
   // ── Summary stats for Salary Report ─────────────────────────────────────────
   const salaryStats = useMemo(() => ({
@@ -158,8 +173,11 @@ export default function ReportsPage() {
     <ReportFilters
       month={month} year={year} branch={branch} employeeId={employeeId}
       branches={branches} employees={employees}
+      fromDate={fromDate} toDate={toDate}
       onMonthChange={setMonth} onYearChange={setYear}
       onBranchChange={setBranch} onEmployeeChange={setEmployeeId}
+      onFromDateChange={setFromDate} onToDateChange={setToDate}
+      onClearDateRange={() => { setFromDate(''); setToDate('') }}
       onDownloadPDF={handleDownloadPDF}
       onDownloadExcel={() => handleDownloadExcel(type)}
     />

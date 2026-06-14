@@ -2,9 +2,10 @@
 
 import { usePathname } from 'next/navigation'
 import { useTheme } from 'next-themes'
-import { Sun, Moon, Menu, Bell } from 'lucide-react'
+import { Sun, Moon, Menu, LogOut, ShieldCheck, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useSettings } from '@/hooks/useSettings'
+import type { AuthSession } from '@/types'
 
 const pageTitles: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -12,21 +13,27 @@ const pageTitles: Record<string, string> = {
   '/attendance': 'Attendance',
   '/salary': 'Salary Management',
   '/advances': 'Advance Management',
+  '/payments': 'Payments & Cash',
   '/reports': 'Reports',
   '/settings': 'Settings',
+  '/admin': 'Admin Panel',
 }
 
 interface NavbarProps {
   collapsed: boolean
   onMobileMenuOpen: () => void
+  session: AuthSession | null
+  onLogout: () => void
 }
 
-export function Navbar({ collapsed, onMobileMenuOpen }: NavbarProps) {
+export function Navbar({ collapsed, onMobileMenuOpen, session, onLogout }: NavbarProps) {
   const pathname = usePathname()
   const { theme, setTheme } = useTheme()
   const { settings } = useSettings()
 
-  const title = Object.entries(pageTitles).find(([k]) => pathname === k || pathname.startsWith(k + '/'))?.[1] ?? 'Dashboard'
+  const title    = Object.entries(pageTitles).find(([k]) => pathname === k || pathname.startsWith(k + '/'))?.[1] ?? 'Dashboard'
+  const initials = session?.username?.slice(0, 2).toUpperCase() ?? 'AD'
+  const isAdmin  = session?.role === 'admin'
 
   return (
     <header
@@ -55,9 +62,31 @@ export function Navbar({ collapsed, onMobileMenuOpen }: NavbarProps) {
           {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
 
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 text-xs font-semibold">
-          AD
+        {/* User badge */}
+        <div className="flex items-center gap-2">
+          <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold ${
+            isAdmin
+              ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+              : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+          }`}>
+            {isAdmin ? <ShieldCheck className="h-4 w-4" /> : <User className="h-4 w-4" />}
+          </div>
+          <div className="hidden sm:block">
+            <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-tight">{session?.username ?? 'Admin'}</p>
+            <p className="text-[10px] text-slate-400 capitalize leading-tight">{session?.role ?? 'admin'}</p>
+          </div>
         </div>
+
+        {/* Logout */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onLogout}
+          className="text-slate-400 hover:text-red-500 dark:hover:text-red-400"
+          title="Logout"
+        >
+          <LogOut className="h-4 w-4" />
+        </Button>
       </div>
     </header>
   )

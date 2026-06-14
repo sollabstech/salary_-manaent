@@ -45,6 +45,8 @@ export interface SalaryRecord {
   absentDays: number;
   halfDays: number;
   leaveDays: number;
+  paidLeaveAllowed: number;
+  extraLeaveDays: number;
   overtimeDays: number;
   lateDeduction: number;
   leaveDeduction: number;
@@ -52,6 +54,8 @@ export interface SalaryRecord {
   bonus: number;
   otherDeductions: number;
   finalSalary: number;
+  cashPayment: number;
+  bankPayment: number;
   paid: boolean;
   paidDate?: string;
   remarks?: string;
@@ -74,6 +78,41 @@ export interface AdvanceRecord {
   adjustedAmount: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface TreasuryData {
+  bankBalance: number
+  cashInHand: number
+  updatedAt: string
+}
+
+export interface UserPermissions {
+  dashboard: boolean
+  employees: boolean
+  attendance: boolean
+  salary: boolean
+  advances: boolean
+  payments: boolean
+  reports: boolean
+  settings: boolean
+}
+
+export interface AuthUser {
+  id: string
+  username: string
+  password: string
+  role: 'admin' | 'user'
+  permissions: UserPermissions
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AuthSession {
+  userId: string
+  username: string
+  role: 'admin' | 'user'
+  permissions: UserPermissions
+  loginAt: string
 }
 
 export interface CompanySettings {

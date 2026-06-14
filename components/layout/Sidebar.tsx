@@ -6,19 +6,30 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Users, CalendarCheck, DollarSign,
   CreditCard, FileBarChart, Settings, ChevronLeft,
-  ChevronRight, Building2, Menu, X
+  ChevronRight, Building2, X, Wallet, ShieldCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState, useEffect } from 'react'
+import type { AuthSession, UserPermissions } from '@/types'
 
-const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/employees', label: 'Employees', icon: Users },
-  { href: '/attendance', label: 'Attendance', icon: CalendarCheck },
-  { href: '/salary', label: 'Salary', icon: DollarSign },
-  { href: '/advances', label: 'Advances', icon: CreditCard },
-  { href: '/reports', label: 'Reports', icon: FileBarChart },
-  { href: '/settings', label: 'Settings', icon: Settings },
+type NavItem = {
+  href: string
+  label: string
+  icon: React.ElementType
+  permKey?: keyof UserPermissions
+  adminOnly?: boolean
+}
+
+const navItems: NavItem[] = [
+  { href: '/dashboard', label: 'Dashboard',   icon: LayoutDashboard },
+  { href: '/employees', label: 'Employees',   icon: Users,         permKey: 'employees'  },
+  { href: '/attendance',label: 'Attendance',  icon: CalendarCheck, permKey: 'attendance' },
+  { href: '/salary',    label: 'Salary',      icon: DollarSign,    permKey: 'salary'     },
+  { href: '/advances',  label: 'Advances',    icon: CreditCard,    permKey: 'advances'   },
+  { href: '/payments',  label: 'Payments',    icon: Wallet,        permKey: 'payments'   },
+  { href: '/reports',   label: 'Reports',     icon: FileBarChart,  permKey: 'reports'    },
+  { href: '/settings',  label: 'Settings',    icon: Settings,      permKey: 'settings'   },
+  { href: '/admin',     label: 'Admin Panel', icon: ShieldCheck,   adminOnly: true       },
 ]
 
 interface SidebarProps {
@@ -26,10 +37,18 @@ interface SidebarProps {
   onToggle: () => void
   mobileOpen: boolean
   onMobileClose: () => void
+  session: AuthSession | null
 }
 
-export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose, session }: SidebarProps) {
   const pathname = usePathname()
+
+  const visibleItems = navItems.filter(item => {
+    if (item.adminOnly) return session?.role === 'admin'
+    if (!item.permKey)  return true                                     // dashboard — always shown
+    if (session?.role === 'admin') return true                          // admin sees all
+    return session?.permissions[item.permKey] ?? false
+  })
 
   const SidebarContent = () => (
     <div className="flex h-full flex-col">
@@ -75,9 +94,10 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
+        {visibleItems.map((item) => {
           const Icon = item.icon
           const active = pathname === item.href || pathname.startsWith(item.href + '/')
+          const isAdmin = item.adminOnly
           return (
             <Link
               key={item.href}
@@ -86,11 +106,18 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
               className={cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 group',
                 active
-                  ? 'bg-purple-600 text-white shadow-sm shadow-purple-900/30'
+                  ? isAdmin
+                    ? 'bg-amber-500/20 text-amber-200 shadow-sm'
+                    : 'bg-purple-600 text-white shadow-sm shadow-purple-900/30'
                   : 'text-purple-200 hover:bg-white/10 hover:text-white'
               )}
             >
-              <Icon className={cn('h-5 w-5 shrink-0', active ? 'text-white' : 'text-purple-300 group-hover:text-white')} />
+              <Icon className={cn(
+                'h-5 w-5 shrink-0',
+                active
+                  ? isAdmin ? 'text-amber-300' : 'text-white'
+                  : 'text-purple-300 group-hover:text-white'
+              )} />
               <AnimatePresence mode="wait">
                 {!collapsed && (
                   <motion.span
@@ -109,11 +136,23 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
         })}
       </nav>
 
-      {/* Footer */}
-      {!collapsed && (
-        <div className="p-4 border-t border-white/10">
-          <p className="text-[10px] text-purple-400 text-center">SEP Salary Shop v1.0</p>
-          <p className="text-[10px] text-purple-500 text-center">Fully Offline & Secure</p>
+      {/* Footer — show logged in user */}
+      {!collapsed && session && (
+        <div className="p-4 border-t border-white/10 space-y-1">
+          <div className="flex items-center gap-2">
+            <div className={cn(
+              'flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold',
+              session.role === 'admin'
+                ? 'bg-amber-500/20 text-amber-300'
+                : 'bg-purple-500/20 text-purple-300'
+            )}>
+              {session.username.slice(0, 2).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-white truncate">{session.username}</p>
+              <p className="text-[10px] text-purple-400 capitalize">{session.role}</p>
+            </div>
+          </div>
         </div>
       )}
     </div>
