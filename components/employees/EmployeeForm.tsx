@@ -14,6 +14,7 @@ import { fileToBase64, generateEmployeeId } from '@/lib/utils'
 import { useRef, useState, useEffect } from 'react'
 import { Camera } from 'lucide-react'
 import { toast } from 'sonner'
+import { useBranches } from '@/hooks/useBranches'
 
 const schema = z.object({
   employeeId:  z.string().min(1, 'Employee ID is required'),
@@ -86,6 +87,7 @@ function getDefaults(employee: Employee | null | undefined, count: number): Form
 }
 
 export function EmployeeForm({ open, onOpenChange, employee, employeeCount, onSubmit }: EmployeeFormProps) {
+  const { branches } = useBranches()
   const [imageBase64, setImageBase64] = useState<string | undefined>()
   // Avatar initials update only on blur — avoids re-render-on-keystroke problem
   const [avatarName, setAvatarName] = useState(employee?.name ?? '')
@@ -189,7 +191,31 @@ export function EmployeeForm({ open, onOpenChange, employee, employeeCount, onSu
             </Field>
 
             <Field label="Branch *" error={errors.branch?.message}>
-              <Input {...register('branch')} placeholder="Head Office" />
+              <Controller
+                name="branch"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className={errors.branch ? 'border-red-500' : ''}>
+                      <SelectValue placeholder="Select branch…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {branches.map(b => (
+                        <SelectItem key={b.id} value={b.name}>{b.name}</SelectItem>
+                      ))}
+                      {/* Keep legacy value if not in branch list */}
+                      {field.value && !branches.find(b => b.name === field.value) && (
+                        <SelectItem value={field.value}>{field.value}</SelectItem>
+                      )}
+                      {branches.length === 0 && (
+                        <div className="px-3 py-2 text-xs text-slate-400">
+                          No branches yet — add one in Branch Management
+                        </div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </Field>
 
             <Field label="Monthly Salary (₹) *" error={errors.salary?.message}>

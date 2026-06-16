@@ -10,6 +10,7 @@ import type { AuthSession } from '@/types'
 const pageTitles: Record<string, string> = {
   '/dashboard': 'Dashboard',
   '/employees': 'Employee Management',
+  '/branches':  'Branch Management',
   '/attendance': 'Attendance',
   '/salary': 'Salary Management',
   '/advances': 'Advance Management',

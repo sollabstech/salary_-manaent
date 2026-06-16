@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Users, CalendarCheck, DollarSign,
   CreditCard, FileBarChart, Settings, ChevronLeft,
-  ChevronRight, Building2, X, Wallet, ShieldCheck,
+  ChevronRight, Building2, X, Wallet, ShieldCheck, MapPin,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState, useEffect } from 'react'
@@ -23,6 +23,7 @@ type NavItem = {
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard',   icon: LayoutDashboard },
   { href: '/employees', label: 'Employees',   icon: Users,         permKey: 'employees'  },
+  { href: '/branches',  label: 'Branches',    icon: MapPin,        permKey: 'employees'  },
   { href: '/attendance',label: 'Attendance',  icon: CalendarCheck, permKey: 'attendance' },
   { href: '/salary',    label: 'Salary',      icon: DollarSign,    permKey: 'salary'     },
   { href: '/advances',  label: 'Advances',    icon: CreditCard,    permKey: 'advances'   },

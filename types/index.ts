@@ -80,6 +80,15 @@ export interface AdvanceRecord {
   updatedAt: string;
 }
 
+export interface Branch {
+  id: string
+  name: string
+  address?: string
+  phone?: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface TreasuryData {
   bankBalance: number
   cashInHand: number
